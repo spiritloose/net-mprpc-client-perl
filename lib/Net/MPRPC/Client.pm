@@ -26,6 +26,7 @@ sub new {
 
     $args->{_id} = 0;
     $args->{timeout} ||= 30;
+    $args->{buffer_size} ||= 512;
     $args->{_error} = q[];
 
     bless $args, $class;
@@ -106,7 +107,7 @@ sub call {
             if $sock ne $ready[0];
 
         my $buf;
-        unless (my $l = $sock->sysread($buf, 512)) {
+        unless (my $l = $sock->sysread($buf, $self->{buffer_size})) {
             my $e = $!;
             $self->disconnect;
             croak qq/Error reading socket: $e/;
@@ -206,6 +207,10 @@ MessagePack-RPC server's port or UNIX socket path to connect.
 =item * timeout => 'Int'
 
 Timeout (second) to connect. Default value is 30 seconds.
+
+=item * buffer_size => 'Int'
+
+Buffer size (bytes) to read. Default value is 512 bytes.
 
 =back
 
