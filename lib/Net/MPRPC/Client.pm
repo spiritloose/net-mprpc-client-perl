@@ -100,7 +100,7 @@ sub call {
     my $unpacker = Data::MessagePack::Unpacker->new;
     my $nread    = 0;
 
-    while ($limit >= time) {
+    do {
         my @ready = $select->can_read( $limit - time )
             or last;
 
@@ -139,7 +139,7 @@ sub call {
 
             return $res->[MP_RES_RESULT];
         }
-    }
+    } while ($limit >= time);
 
     $self->disconnect;
     croak 'request timeout';
