@@ -92,7 +92,6 @@ sub call {
 
     my $timeout = $sock->timeout;
     my $limit   = time + $timeout;
-    my $buf     = q[];
 
     my $select = IO::Select->new or croak $!;
     $select->add($sock);
@@ -106,7 +105,8 @@ sub call {
         croak q/Fatal error on select, $ready[0] isn't $sock/
             if $sock ne $ready[0];
 
-        unless (my $l = $sock->sysread($buf, 512, length $buf)) {
+        my $buf;
+        unless (my $l = $sock->sysread($buf, 512)) {
             my $e = $!;
             $self->disconnect;
             croak qq/Error reading socket: $e/;
