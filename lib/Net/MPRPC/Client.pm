@@ -11,6 +11,7 @@ our $_HAVE_UNIX_SOCKET = 1;
 eval q[use IO::Socket::INET; 1];
 if ($@) { $_HAVE_UNIX_SOCKET = 0 }
 
+use Time::HiRes qw(time);
 use Try::Tiny;
 use Carp;
 use Data::MessagePack;
