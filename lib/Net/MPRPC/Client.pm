@@ -14,6 +14,7 @@ if ($@) { $_HAVE_UNIX_SOCKET = 0 }
 use Try::Tiny;
 use Carp;
 use Data::MessagePack;
+use Data::MessagePack::Stream;
 
 use constant MP_REQ_TYPE   => 0;
 use constant MP_RES_ERROR  => 2;
@@ -96,8 +97,7 @@ sub call {
     my $select = IO::Select->new or croak $!;
     $select->add($sock);
 
-    my $unpacker = Data::MessagePack::Unpacker->new;
-    my $nread    = 0;
+    my $unpacker = Data::MessagePack::Stream->new;
 
     while ($limit >= time) {
         my @ready = $select->can_read( $limit - time )
@@ -112,18 +112,10 @@ sub call {
             croak qq/Error reading socket: $e/;
         }
 
-        try {
-            $nread = $unpacker->execute($buf, $nread);
-        } catch {
-            $self->{_error} = $_;
-            $self->disconnect;
-            $unpacker->reset;
-        };
-        return if $self->{_error};
+        $unpacker->feed($buf);
 
-        if ($unpacker->is_finished) {
+        if ($unpacker->next) {
             my $res = $unpacker->data;
-            $unpacker->reset;
 
             unless ($res and ref $res eq 'ARRAY') {
                 $self->{_error} = 'Invalid response from server';
