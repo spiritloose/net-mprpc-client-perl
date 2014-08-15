@@ -11,6 +11,7 @@ our $_HAVE_UNIX_SOCKET = 1;
 eval q[use IO::Socket::INET; 1];
 if ($@) { $_HAVE_UNIX_SOCKET = 0 }
 
+use Time::HiRes qw(time);
 use Try::Tiny;
 use Carp;
 use Data::MessagePack;
@@ -99,7 +100,7 @@ sub call {
     my $unpacker = Data::MessagePack::Unpacker->new;
     my $nread    = 0;
 
-    while ($limit >= time) {
+    do {
         my @ready = $select->can_read( $limit - time )
             or last;
 
@@ -138,7 +139,7 @@ sub call {
 
             return $res->[MP_RES_RESULT];
         }
-    }
+    } while ($limit >= time);
 
     $self->disconnect;
     croak 'request timeout';
