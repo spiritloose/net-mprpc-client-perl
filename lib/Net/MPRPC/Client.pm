@@ -15,6 +15,7 @@ use Time::HiRes qw(time);
 use Try::Tiny;
 use Carp;
 use Data::MessagePack;
+use Data::MessagePack::Stream;
 
 use constant MP_REQ_TYPE   => 0;
 use constant MP_RES_ERROR  => 2;
@@ -26,6 +27,7 @@ sub new {
 
     $args->{_id} = 0;
     $args->{timeout} ||= 30;
+    $args->{buffer_size} ||= 512;
     $args->{_error} = q[];
 
     bless $args, $class;
@@ -92,13 +94,11 @@ sub call {
 
     my $timeout = $sock->timeout;
     my $limit   = time + $timeout;
-    my $buf     = q[];
 
     my $select = IO::Select->new or croak $!;
     $select->add($sock);
 
-    my $unpacker = Data::MessagePack::Unpacker->new;
-    my $nread    = 0;
+    my $unpacker = Data::MessagePack::Stream->new;
 
     do {
         my @ready = $select->can_read( $limit - time )
@@ -107,24 +107,17 @@ sub call {
         croak q/Fatal error on select, $ready[0] isn't $sock/
             if $sock ne $ready[0];
 
-        unless (my $l = $sock->sysread($buf, 512, length $buf)) {
+        my $buf;
+        unless (my $l = $sock->sysread($buf, $self->{buffer_size})) {
             my $e = $!;
             $self->disconnect;
             croak qq/Error reading socket: $e/;
         }
 
-        try {
-            $nread = $unpacker->execute($buf, $nread);
-        } catch {
-            $self->{_error} = $_;
-            $self->disconnect;
-            $unpacker->reset;
-        };
-        return if $self->{_error};
+        $unpacker->feed($buf);
 
-        if ($unpacker->is_finished) {
+        if ($unpacker->next) {
             my $res = $unpacker->data;
-            $unpacker->reset;
 
             unless ($res and ref $res eq 'ARRAY') {
                 $self->{_error} = 'Invalid response from server';
@@ -215,6 +208,10 @@ MessagePack-RPC server's port or UNIX socket path to connect.
 =item * timeout => 'Int'
 
 Timeout (second) to connect. Default value is 30 seconds.
+
+=item * buffer_size => 'Int'
+
+Buffer size (bytes) to read. Default value is 512 bytes.
 
 =back
 
