@@ -101,8 +101,11 @@ sub call {
     my $unpacker = Data::MessagePack::Stream->new;
 
     do {
-        my @ready = $select->can_read( $limit - time )
-            or last;
+        my @ready = $select->can_read( $limit - time );
+        unless (@ready) {
+            $self->disconnect;
+            croak 'request timeout';
+        }
 
         croak q/Fatal error on select, $ready[0] isn't $sock/
             if $sock ne $ready[0];
